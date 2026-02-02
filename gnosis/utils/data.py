@@ -12,8 +12,12 @@ import os
 
 from torchvision.datasets.folder import ImageFolder
 
-from torchtext.data.utils import get_tokenizer
-from torchtext.vocab import build_vocab_from_iterator
+try:
+    from torchtext.data.utils import get_tokenizer
+    from torchtext.vocab import build_vocab_from_iterator
+except (ImportError, OSError):
+    get_tokenizer = None
+    build_vocab_from_iterator = None
 
 
 def get_loaders(config):
