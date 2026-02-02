@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+from setuptools import setup, find_packages
 
 setup(
     name='gnosis',
@@ -9,4 +9,5 @@ setup(
     author='Samuel Stanton, Pavel Izmailov, and Polina Kirichenko',
     author_email='ss13641@nyu.edu',
     url='https://github.com/samuelstanton/gnosis.git',
+    packages=find_packages(include=['gnosis', 'gnosis.*', 'cka', 'cka.*']),
 )
