@@ -1,0 +1,46 @@
+\documentclass[10pt]{article}
+\usepackage[accepted]{icml2026}
+\makeatletter
+\renewcommand{\ICML@appearing}{}
+\makeatother
+
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{subcaption}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{float}
+
+\icmltitlerunning{Replication Study: Does Knowledge Distillation Really Work?}
+
+\begin{document}
+
+\twocolumn[
+\icmltitle{Replication Study: Does Knowledge Distillation Really Work?}
+
+\begin{icmlauthorlist}
+\icmlauthor{Rasul Alakbarli}{univ}
+\icmlauthor{Mahammad Nuriyev}{univ}
+\icmlauthor{Petko Petko}{univ}
+\icmlauthor{Dmitrije Zdrale}{univ}
+\end{icmlauthorlist}
+
+\icmlaffiliation{univ}{Course Project, Learning Theory and Advanced Machine Learning, February 2026}
+
+\icmlcorrespondingauthor{Mahammad Nuriyev}{mahammad.nuriyev@universite-paris-saclay.fr}
+
+\icmlkeywords{knowledge distillation, fidelity, replication study}
+
+\vskip 0.3in
+
+\begin{abstract}
+We replicate key experiments from \emph{``Does Knowledge Distillation Really Work?''} by Stanton et al.\ (NeurIPS 2021). The paper investigates a fundamental tension in knowledge distillation: while distilled students often achieve good generalization, they exhibit surprisingly poor \emph{fidelity} to their teachers' predictions. We reproduce experiments on CIFAR-100 using PreResNet-20 architectures, examining self-distillation, ensemble distillation, initialization proximity, and representational similarity via Centered Kernel Alignment (CKA). Our results confirm the paper's central finding: knowledge distillation improves student generalization but transfers limited knowledge from teacher to student, with optimization difficulties being the primary cause of low fidelity. We additionally compute pairwise agreement between independently trained teachers to establish how much they already agree without distillation, finding that distillation improves fidelity by only $\sim$8 percentage points over this baseline. We document the practical challenges of replication with modern software stacks.
+\end{abstract}
+]
+
+\printAffiliationsAndNotice{}
+
+\bibliographystyle{icml2026}
+\bibliography{references}
+
+\end{document}
