@@ -40,6 +40,25 @@ We replicate key experiments from \emph{``Does Knowledge Distillation Really Wor
 
 \printAffiliationsAndNotice{}
 
+\section{Introduction}
+
+Knowledge distillation (KD), introduced by \citet{hinton2015distilling} and rooted in earlier model compression work by \citet{bucilua2006model}, is one of the most widely-used techniques for deploying neural networks in resource-constrained settings. The core idea is to train a smaller \emph{student} network to emulate a larger, more capable \emph{teacher} model by matching the teacher's soft output distribution rather than (or in addition to) the hard training labels. This technique has found broad application in model deployment, ensemble compression, and continual learning.
+
+The conventional understanding of KD is that the student learns a high-fidelity representation of the teacher's knowledge through its soft labels, namely that the ``dark knowledge'' encoded in the teacher's output distribution over non-target classes provides rich supervisory signal that hard labels alone cannot capture \citep{hinton2015distilling}. This narrative has motivated numerous extensions, including intermediate representation matching \citep{romero2015fitnets}, contrastive distillation \citep{tian2020contrastive}, and self-distillation \citep{furlanello2018born}, each aiming to transfer more information from teacher to student.
+
+However, \citet{stanton2021does} challenge this narrative by carefully distinguishing between two properties that are often conflated:
+
+\emph{Generalization} refers to the student's performance on unseen test data, measured by accuracy, negative log-likelihood (NLL), and expected calibration error (ECE). \emph{Fidelity} refers to the degree to which the student's predictions match the teacher's, measured by top-1 agreement and predictive KL divergence.
+
+The key finding is that while KD often improves generalization, it frequently fails to produce high-fidelity students, even when the student has identical capacity to the teacher (self-distillation). This contradicts the standard narrative: if the student is simply ``learning the teacher's knowledge,'' it should reproduce the teacher's predictions. The fact that it does not suggests that KD's benefit may come from regularization or label smoothing rather than genuine knowledge transfer.
+
+The authors investigate multiple hypotheses: (1) \emph{insufficient data}, that perhaps more distillation data would improve fidelity; (2) \emph{optimization difficulties}, that perhaps standard optimizers cannot find the teacher's solution; and (3) \emph{inductive biases}, that perhaps differences in augmentation or architecture prevent matching. They ultimately conclude that optimization is the primary bottleneck, demonstrating a sharp phase transition in the loss landscape that determines whether the student converges to the teacher's basin.
+
+These findings have significant practical implications. Model compression via distillation is widely used in industry: deploying ensemble predictions through a single student, compressing large language models for edge devices, and transferring knowledge between modalities. If the student does not faithfully reproduce the teacher's behavior, then the compressed model may have different failure modes, different calibration properties, and different biases than the original, even if aggregate metrics (like accuracy) look similar. For safety-critical applications, understanding whether distillation preserves the teacher's specific behavior (not just its aggregate performance) is essential.
+
+In this replication study, we reproduce the core experiments using CIFAR-100 with PreResNet-20 architectures. We focus on the experiments that most directly support the paper's key claims: self-distillation fidelity (Figure 1a in the original), ensemble distillation fidelity (Figure 1b), student initialization proximity and loss landscape structure (Figure 6b), and CKA representational similarity analysis (Table 1). We additionally contribute an \emph{additional baseline analysis} not present in the original work: computing pairwise agreement between independently trained teacher models. This baseline provides essential context for interpreting the fidelity gap; specifically, it reveals how much agreement improvement distillation provides beyond what independent training achieves.
+
+
 \bibliographystyle{icml2026}
 \bibliography{references}
 
