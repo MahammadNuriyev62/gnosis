@@ -58,6 +58,53 @@ These findings have significant practical implications. Model compression via di
 
 In this replication study, we reproduce the core experiments using CIFAR-100 with PreResNet-20 architectures. We focus on the experiments that most directly support the paper's key claims: self-distillation fidelity (Figure 1a in the original), ensemble distillation fidelity (Figure 1b), student initialization proximity and loss landscape structure (Figure 6b), and CKA representational similarity analysis (Table 1). We additionally contribute an \emph{additional baseline analysis} not present in the original work: computing pairwise agreement between independently trained teacher models. This baseline provides essential context for interpreting the fidelity gap; specifically, it reveals how much agreement improvement distillation provides beyond what independent training achieves.
 
+\section{Background}
+
+\subsection{Knowledge Distillation}
+
+In the supervised classification setting with $c$ classes, a classifier $f: \mathcal{X} \times \Theta \rightarrow \mathbb{R}^c$ produces logits defining a predictive distribution $\hat{p}(y=i|x) = \sigma_i(f(x, \theta))$ via the softmax $\sigma$.
+
+Given a trained teacher with parameters $\theta_t$, \citet{hinton2015distilling} proposed minimizing:
+\begin{equation}
+    \mathcal{L}_s = \alpha \mathcal{L}_{\text{NLL}} + (1-\alpha) \mathcal{L}_{\text{KD}},
+\end{equation}
+where $\mathcal{L}_{\text{NLL}} = -\log \hat{p}(y=y^*|x)$ is the standard cross-entropy and:
+\begin{equation}
+    \mathcal{L}_{\text{KD}}(z_s, z_t) = -\tau^2 \sum_{j=1}^{c} \sigma_j\!\left(\frac{z_t}{\tau}\right) \log \sigma_j\!\left(\frac{z_s}{\tau}\right),
+\end{equation}
+with $z_s, z_t$ being student and teacher logits and $\tau > 0$ a temperature hyperparameter. The $\tau^2$ factor ensures gradients scale appropriately. As $\tau \rightarrow \infty$, the softmax approaches a uniform distribution, and gradient information is dominated by relative logit magnitudes.
+
+Following the original paper, we set $\alpha = 0$ in all main experiments to isolate the effect of distillation without confounding from hard labels. With $\alpha = 0$, any accuracy improvement is entirely attributable to the teacher's soft labels.
+
+\subsection{Metrics}
+
+We report both \emph{generalization} and \emph{fidelity} metrics. The generalization metrics are \textbf{top-1 accuracy} (fraction of test examples correctly classified), \textbf{negative log-likelihood} (NLL; average $-\log \hat{p}(y=y^*|x)$ on the test set, measuring the quality of the full predictive distribution), and \textbf{expected calibration error} (ECE; whether predicted confidences match true correctness probabilities, computed using 10 equal-width bins).
+
+The fidelity metrics, which are the primary focus of this study, are \textbf{top-1 agreement} (fraction of test examples where teacher and student predict the same class: $\frac{1}{N}\sum_{i=1}^{N} \mathbb{1}[\hat{y}_t(x_i) = \hat{y}_s(x_i)]$), \textbf{predictive KL} (average KL divergence from teacher to student: $\frac{1}{N}\sum_{i=1}^{N} \text{KL}(\hat{p}_t(\cdot|x_i) \| \hat{p}_s(\cdot|x_i))$, capturing differences in the full distribution), and \textbf{CKA} (Centered Kernel Alignment~\citep{kornblith2019similarity} between intermediate representations, measuring structural similarity in learned feature spaces).
+A perfect distillation would yield 100\% agreement and zero KL divergence. The central question is how far real distillation falls short. Importantly, the paper argues that agreement and accuracy can be \emph{negatively} correlated in the self-distillation setting: the student's best accuracy comes not from matching the teacher but from finding its own, different solution.
+
+\subsection{Ensemble Teachers}
+
+Deep ensembles \citep{lakshminarayanan2017simple} combine $m$ independently trained models. The ensemble teacher logits are:
+\begin{equation}
+z_t = \log\!\left(\frac{1}{m}\sum_{i=1}^{m} \sigma(z_i)\right),
+\end{equation}
+corresponding to the model-averaged distribution. Ensemble distillation is practically important because ensembles are expensive to deploy \citep{hinton2015distilling}.
+
+\subsection{Self-Distillation}
+
+In \emph{self-distillation}, teacher and student share the same architecture and capacity. \citet{furlanello2018born} showed self-distillation can \emph{improve} accuracy beyond the teacher, a phenomenon they called ``Born Again Neural Networks.'' This creates a paradox: the student supposedly learns from the teacher yet outperforms it. Stanton et al.\ resolve this by showing the student is \emph{not} faithfully learning the teacher; it improves precisely because it diverges from the teacher's predictions. The soft labels act as a form of regularization that guides the student to a different (and sometimes better) solution, rather than transferring the teacher's specific decision boundaries.
+
+This perspective reframes self-distillation as a \emph{training strategy} rather than a \emph{knowledge transfer} method. The teacher provides useful training signal, but the student uses this signal to find its own solution rather than reproducing the teacher's. Understanding this distinction is crucial for practitioners who expect the distilled model to behave ``like the teacher but smaller.''
+
+\subsection{CKA: Centered Kernel Alignment}
+
+Two networks may produce similar predictions while organizing their internal representations differently, or conversely, learn similar representations yet disagree on outputs. CKA \citep{kornblith2019similarity} quantifies the similarity of intermediate representations between networks, invariant to orthogonal transformations and isotropic scaling. Given the same inputs, we extract activation matrices from corresponding layers of the teacher and student and compute, for representation matrices $X$ and $Y$:
+\begin{equation}
+\text{CKA}(X, Y) = \frac{\text{HSIC}(K_X, K_Y)}{\sqrt{\text{HSIC}(K_X, K_X) \cdot \text{HSIC}(K_Y, K_Y)}},
+\end{equation}
+where HSIC is the Hilbert-Schmidt Independence Criterion. CKA ranges from 0 (dissimilar) to 1 (identical up to invariances). We compute CKA at each of PreResNet-20's three residual stages.
+
 
 \bibliographystyle{icml2026}
 \bibliography{references}
