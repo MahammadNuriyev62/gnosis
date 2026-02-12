@@ -105,6 +105,76 @@ Two networks may produce similar predictions while organizing their internal rep
 \end{equation}
 where HSIC is the Hilbert-Schmidt Independence Criterion. CKA ranges from 0 (dissimilar) to 1 (identical up to invariances). We compute CKA at each of PreResNet-20's three residual stages.
 
+\section{Experimental Setup}
+
+\subsection{Architecture}
+
+We use Pre-activation ResNet-20 (PreResNet-20) \citep{he2016identity} throughout, with $\sim$0.27M parameters, three residual stages with [16, 32, 64] filters, and pre-activation batch normalization. Input size is $32 \times 32$ (CIFAR-100).
+
+\subsection{Training Configuration}
+
+\textbf{Teachers} are trained for 200 epochs with SGD (momentum=0.9, Nesterov, weight decay $10^{-4}$), learning rate 0.1 with cosine annealing, batch size 256. We train 5 teachers with different random seeds.
+
+\textbf{Students} are trained for 300 epochs with learning rate $5 \times 10^{-2}$, cosine annealing to $10^{-6}$, SGD with Nesterov momentum, weight decay $10^{-4}$, batch size 128. Default: temperature $\tau=4$, $\alpha=0$ (pure soft labels).
+
+\textbf{Data augmentation}: random crops ($32 \times 32$, 4px padding) and random horizontal flips. Pixels normalized to $[-1, 1]$ via unitcube normalization. These settings serve as the default configuration; individual experiments modify specific factors as described in their respective sections.
+
+\subsection{Teacher Training Results}
+
+We trained 5 PreResNet-20 teachers on CIFAR-100 (Table~\ref{tab:teachers}).
+
+\begin{table}[t]
+\centering
+\caption{Teacher model results (CIFAR-100, 200 epochs).}
+\label{tab:teachers}
+\begin{small}
+\begin{tabular}{lcc}
+\toprule
+Model & Test Acc (\%) & Train Acc (\%) \\
+\midrule
+Teacher 0 & 65.22 & 94.18 \\
+Teacher 1 & 65.34 & 93.86 \\
+Teacher 2 & 64.83 & 93.56 \\
+Teacher 3 & 64.63 & 93.36 \\
+Teacher 4 & 65.21 & 93.76 \\
+\midrule
+Mean & 65.05 $\pm$ 0.27 & 93.74 $\pm$ 0.28 \\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{table}
+
+Our teacher accuracy ($\sim$65\%) is lower than the $\sim$70.5\% in the original paper, likely due to PyTorch version differences (2.10 vs.\ 1.10) affecting cuDNN algorithms and batch normalization numerics. This gap does not affect qualitative findings about fidelity versus generalization, which are the paper's core contribution.
+
+\subsection{Deviations from Original Setup}
+
+The original paper's codebase targets Python 3.8 and PyTorch 1.10, which are difficult to reproduce exactly with current CUDA drivers and hardware. We use modern versions and document the resulting differences in Table~\ref{tab:deviations}.
+
+\begin{table}[t]
+\centering
+\caption{Key deviations from the original setup.}
+\label{tab:deviations}
+\begin{small}
+\begin{tabular}{lll}
+\toprule
+Aspect & Original & Ours \\
+\midrule
+Python & 3.8 & 3.12 \\
+PyTorch & 1.10+cu113 & 2.10+cu128 \\
+GPU & Not specified & RTX 4060 Ti \\
+Norm (Exp.\ 3) & LayerNorm & BatchNorm \\
+$\lambda$ values & Dense sweep & Sparse \\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{table}
+
+A notable deviation concerns the initialization proximity experiment (Exp.\ 3) only: the original paper specifies LayerNorm for this experiment because BatchNorm statistics depend on the training data, making interpolation between models less straightforward. All other experiments use BatchNorm in both the original work and our replication. However, the released codebase uses BatchNorm throughout with no LayerNorm variant provided, and we treated the codebase as the source of truth. As we show in Figure~\ref{fig:initialization}, the phase transition is still clearly observed with BatchNorm, suggesting this deviation does not undermine the core finding. Additionally, the original paper sweeps $\lambda$ densely to produce a smooth phase transition curve, whereas we test only a few values due to compute constraints, as each requires a full training run.
+
+\subsection{Infrastructure}
+
+As no team member had access to a local GPU, we allocated a budget of 15 EUR to rent an RTX 4060 Ti machine through the vast.ai cloud platform. Each team member accessed the machine via SSH with a separate Linux user account, providing isolation and traceability for all operations. We used Git and GitHub for version control to coordinate the work.\footnote{Repository: \url{https://github.com/MahammadNuriyev62/gnosis}}
+
 
 \bibliographystyle{icml2026}
 \bibliography{references}
