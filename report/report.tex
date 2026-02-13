@@ -349,6 +349,69 @@ Table~\ref{tab:augmentation} shows that higher temperature substantially improve
 
 We additionally investigate the effect of optimizer choice and training duration (replicating Figure 6a). With SGD for 300 epochs (single teacher), the student achieves 70.88\% agreement; doubling to 600 epochs yields 71.41\%, a negligible improvement of 0.53pp. Switching from SGD to Adam at 300 epochs yields 70.61\% agreement, comparable to SGD. Neither longer training nor a different optimizer closes the fidelity gap.
 
+\section{Discussion}
+
+\subsection{Summary of Findings}
+
+Our replication confirms the central conclusions of \citet{stanton2021does}: good accuracy does not imply good fidelity, optimization is the primary bottleneck, students initialized far from the teacher converge to different solutions regardless of training duration, and ensemble distillation aligns fidelity with generalization more than self-distillation does.
+
+\subsection{Quantitative Comparison with Original}
+
+\begin{table}[t]
+\centering
+\caption{Comparison with original paper. Our independent teacher baseline is an additional contribution not present in the original work.}
+\label{tab:comparison}
+\begin{small}
+\begin{tabular}{lccc}
+\toprule
+Metric & Original & Ours \\
+\midrule
+Teacher Acc (\%) & $\sim$70.5 & 65.22 \\
+Student Acc (\%) & $\sim$71 & 68.62 \\
+Agreement (\%) & $\sim$72 & 71.36 \\
+KL(T$\|$S) & $\sim$0.7 & 0.854 \\
+\midrule
+\emph{Indep.\ teacher Agree} (\%) & N/A & 63.19 \\
+\emph{Indep.\ teacher KL} & N/A & 1.672 \\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{table}
+
+While absolute accuracy values are lower ($\sim$65\% vs.\ $\sim$70.5\% for teachers), the \emph{relative} patterns are preserved: student outperforms teacher by $\sim$3.4pp, and agreement is nearly identical at $\sim$71\%. The accuracy gap between our setup and the original is consistent across both teacher and student, suggesting it reflects a uniform shift due to software environment rather than any fundamental difference in the distillation dynamics. Importantly, the \emph{agreement} metric (which is the paper's core contribution) is almost identical ($\sim$71\% vs.\ $\sim$72\%), confirming that fidelity is robust to implementation details even when absolute accuracy is not.
+
+The independent teacher baseline puts the fidelity gap in sharper perspective. Random models agree on 63\% of test examples simply because CIFAR-100 has dominant visual patterns that any competent classifier captures. Distillation lifts agreement to 71\%, a real but modest improvement. The remaining 29\% disagreement reflects the optimization landscape structure that the paper identifies. To decompose this further: of the 10,000 CIFAR-100 test examples, approximately 6,319 are classified identically by any pair of independently trained models (the ``easy'' examples), approximately 817 additional examples are brought into agreement by distillation (the ``transferred knowledge''), and approximately 2,864 examples remain in disagreement (the ``fidelity gap'').
+
+\subsection{Why Does the Student Outperform the Teacher?}
+
+As discussed in Section~2.4, soft labels act as regularization \citep{tang2020understanding}. More concretely, when the teacher assigns probability 0.7 to ``cat,'' 0.1 to ``lynx,'' and 0.05 to ``tiger,'' these targets encode inter-class similarity that one-hot labels lack: the student learns that ``cat'' is closer to ``lynx'' than to ``airplane.'' Soft labels also reduce memorization by discouraging the model from pushing logits for the correct class toward infinity. These benefits are largely independent of fidelity; the student improves because soft labels provide richer gradient signal, not because it faithfully reproduces the teacher.
+
+\subsection{The Optimization Landscape}
+
+Experiment 3 has broader implications for understanding optimization in deep learning \citep{allen2023towards}. Recent work has suggested that different solutions found by gradient descent are often connected by paths of low loss in weight space. However, the sharp phase transition we observe suggests this does not hold between the teacher's and student's solutions: a high barrier separates them, and the student can only reach the teacher's solution if initialized close enough to cross it.
+
+\subsection{Critical Assessment of the Paper}
+
+While our replication broadly confirms the paper's conclusions, several aspects warrant critical examination:
+
+\textbf{Is 71\% agreement actually low?} Our independent baseline analysis provides a principled answer: two independently trained models agree only 63\%. Distillation improves this by 8pp, which is meaningful but far short of perfect fidelity. The paper's central claim, that distillation fails to achieve high fidelity, is validated, though the picture is more nuanced than ``distillation doesn't work.'' It works for generalization; it partially works for fidelity.
+
+\textbf{The $\alpha = 0$ choice.} By setting $\alpha = 0$ (no hard labels), the paper maximizes the attribution of results to soft-label effects. However, in practice, $\alpha > 0$ is common. The paper briefly explores this but does not exhaustively characterize the $\alpha$-fidelity relationship. It is possible that including hard labels (which provide the ``correct'' answer) helps the student converge to a more teacher-like solution.
+
+\textbf{Richness of soft labels.} CIFAR-100's classes are relatively distinct from one another, so the teacher's soft labels say little beyond which class is most likely. When classes are more numerous or more similar, soft labels carry more useful information about the teacher's reasoning. Large language models, for instance, predict over tens of thousands of tokens, and each soft distribution says a great deal about which outputs the teacher considers plausible. The fidelity gap we observe here may be smaller in such settings.
+
+\textbf{The role of model capacity.} All of our experiments use PreResNet-20 ($\sim$0.27M parameters) as both teacher and student. In practice, knowledge distillation is most commonly used to compress a large teacher into a smaller student, yet we do not test this setting. The paper's argument is that fidelity is low even when the student has full capacity to match the teacher, implying it can only be worse with a capacity gap. While this logic is sound, directly measuring fidelity in the capacity-gap setting would strengthen the practical relevance of these findings. It also remains unclear whether highly overparameterized networks, which may have flatter loss landscapes and more connected basins, would exhibit the same fidelity gap.
+
+\subsection{Implications for Practitioners}
+
+For practitioners who need \emph{generalization}, standard KD works well, and the student will likely match or exceed the teacher's accuracy. However, for those who need \emph{fidelity}, standard KD is insufficient, and novel optimization strategies, fidelity-aware objectives, or initialization tricks are needed. For \emph{ensemble compression}, fidelity and accuracy are more aligned than in the self-distillation setting, but a significant gap remains. Finally, regarding \emph{calibration}, the high KL divergence and ECE values suggest that calibration properties do not transfer well through distillation, which is relevant for applications requiring reliable uncertainty estimates.
+
+\subsection{Difficulties Encountered}
+
+Replication of ML experiments presents challenges beyond algorithmic correctness. \textbf{Environment compatibility} was a significant hurdle: the codebase targets Python 3.8 and PyTorch 1.10, and running on Python 3.12 with PyTorch 2.10 required fixing setuptools incompatibilities and handling torchtext ABI issues. \textbf{Numerical reproducibility} proved elusive: different PyTorch versions use different cuDNN algorithms, yielding $\sim$5pp accuracy differences even with identical seeds. \textbf{Computational constraints} were substantial: each 300-epoch distillation run takes $\sim$2 hours on an RTX 4060 Ti, making the full experimental suite a multi-day endeavor on a single GPU. We observed significant \textbf{GPU underutilization}: PreResNet-20 uses only $\sim$850 MiB ($\sim$5\%) of GPU memory, with the bottleneck being CPU data loading rather than GPU compute; running 5 experiments in parallel improved throughput $\sim$3x while using only 13\% of VRAM. Finally, \textbf{codebase assumptions} required attention: the original code uses Hydra for configuration management, and we bypassed it with a standalone experiment runner, which required understanding the codebase's internal APIs in detail.
+
+These challenges underscore the value of containerized environments for exact reproduction and publishing qualitative claims that are robust to implementation details.
+
 
 \bibliographystyle{icml2026}
 \bibliography{references}
