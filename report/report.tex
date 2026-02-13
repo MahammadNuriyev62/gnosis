@@ -175,6 +175,127 @@ A notable deviation concerns the initialization proximity experiment (Exp.\ 3) o
 
 As no team member had access to a local GPU, we allocated a budget of 15 EUR to rent an RTX 4060 Ti machine through the vast.ai cloud platform. Each team member accessed the machine via SSH with a separate Linux user account, providing isolation and traceability for all operations. We used Git and GitHub for version control to coordinate the work.\footnote{Repository: \url{https://github.com/MahammadNuriyev62/gnosis}}
 
+\section{Experiments and Results}
+
+\subsection{Experiment 1: Self-Distillation}
+
+We replicate the self-distillation setting (Figure 1a) where a PreResNet-20 teacher is distilled into an identical student. If distillation transferred knowledge perfectly, the student would be a functional copy of the teacher.
+
+\begin{table}[t]
+\centering
+\caption{Self-distillation results (3 trials). The student outperforms the teacher but with limited agreement.}
+\label{tab:self_distill}
+\begin{small}
+\begin{tabular}{lccc}
+\toprule
+ & Acc (\%) & Agree (\%) & KL \\
+\midrule
+Teacher & 65.22 & N/A & N/A \\
+Student & 68.62{\scriptsize$\pm$0.17} & 71.36{\scriptsize$\pm$0.27} & 0.854{\scriptsize$\pm$0.005} \\
+\midrule
+\emph{Indep.\ teachers} & 65.05{\scriptsize$\pm$0.27} & 63.19{\scriptsize$\pm$0.33} & 1.672{\scriptsize$\pm$0.019} \\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{table}
+
+\textbf{Analysis.} The student scores higher on test accuracy than its teacher (68.62\% vs.\ 65.22\%), confirming the self-distillation improvement first reported by \citet{furlanello2018born}. Yet the student only agrees with the teacher on 71.36\% of test examples, meaning it gives a different prediction on nearly 29\% of inputs despite outperforming the teacher overall. The KL divergence of 0.854 tells the same story: the two models' full probability distributions differ substantially.
+
+To put these numbers in context, we compute \emph{pairwise agreement between independently trained teachers} as a baseline (Table~\ref{tab:teacher_agree}). Across all $\binom{5}{2}=10$ teacher pairs, mean agreement is $63.19\%$ with mean symmetric KL of $1.672$. Distillation does improve fidelity over independent training: 8.2 percentage points more agreement, with KL roughly halved. Still, this improvement is modest. Distillation transfers some of the teacher's behavior, but the transfer is partial at best.
+
+\begin{table}[t]
+\centering
+\caption{Pairwise agreement between independently trained teachers. This serves as a baseline for evaluating distillation fidelity: if distillation produces similar agreement to independent training, it adds no fidelity beyond what random training achieves.}
+\label{tab:teacher_agree}
+\begin{small}
+\begin{tabular}{ccc}
+\toprule
+Pair & Agreement (\%) & Sym.\ KL \\
+\midrule
+T0 vs T1 & 63.21 & 1.643 \\
+T0 vs T2 & 63.44 & 1.688 \\
+T0 vs T3 & 63.28 & 1.676 \\
+T0 vs T4 & 63.85 & 1.649 \\
+T1 vs T2 & 63.21 & 1.673 \\
+T1 vs T3 & 63.09 & 1.678 \\
+T1 vs T4 & 63.02 & 1.657 \\
+T2 vs T3 & 62.44 & 1.709 \\
+T2 vs T4 & 63.20 & 1.684 \\
+T3 vs T4 & 63.18 & 1.667 \\
+\midrule
+Mean & 63.19 $\pm$ 0.33 & 1.672 $\pm$ 0.019 \\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{table}
+
+All 10 teacher pairs in Table~\ref{tab:teacher_agree} agree at $62.44\%$ to $63.85\%$, a range of only 1.4pp. This narrow spread indicates that the agreement level is a property of the dataset itself (which examples are ``easy'' vs.\ ``hard'') rather than of the random seed. In other words, ${\sim}63\%$ agreement is what any two independently trained models achieve ``for free'' simply by learning from the same data. The distilled student's $71.36\%$ agreement with its teacher is well above this baseline, confirming that the extra ${\sim}8$pp comes from distillation transferring information specific to that particular teacher, beyond what independent training provides.
+
+The student additionally achieves NLL of 20.15 and ECE of 0.14, indicating imperfect calibration consistent with the literature \citep{tang2020understanding}. The high ECE suggests that the student's confidence estimates are not well-calibrated, which has practical implications for applications where reliable uncertainty estimates are important (e.g., medical diagnosis, autonomous driving).
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.95\linewidth]{../plots/training_curves.png}
+\caption{Self-distillation training curves (3 trials). \textbf{Left}: Student accuracy converges above teacher ($\sim$69\% vs.\ 65\%). \textbf{Center}: Agreement plateaus at $\sim$71\%, showing continued training does not improve fidelity. \textbf{Right}: KL drops rapidly then plateaus at $\sim$0.85, far from zero. These dynamics reveal that the student quickly settles into a distinct basin.}
+\label{fig:training_curves}
+\end{figure*}
+
+Figure~\ref{fig:training_curves} reveals the training dynamics in detail. Several observations are noteworthy:
+
+\textbf{Early commitment.} Agreement reaches ${\sim}70\%$ within the first 50 epochs (out of 300) and barely improves thereafter. This suggests the student settles into its own basin of the loss landscape early in training, and subsequent epochs refine the solution within that basin rather than moving it toward the teacher's. The learning rate schedule (cosine annealing from $5 \times 10^{-2}$ to $10^{-6}$) shrinks the step size over time, making a jump between basins increasingly unlikely.
+
+\textbf{Accuracy continues to improve after agreement plateaus.} While agreement stalls at $\sim$71\%, student accuracy continues improving from $\sim$65\% to $\sim$69\%. This directly demonstrates that the student's accuracy gains come from improving \emph{within} its own basin rather than from moving \emph{closer} to the teacher's basin. The student finds a better solution than the teacher but one that produces different predictions on $\sim$29\% of test examples.
+
+\textbf{Low cross-trial variance.} The three trials show remarkably consistent trajectories (shaded bands in Figure~\ref{fig:training_curves}), indicating that the training dynamics are highly deterministic given the same teacher. Different random initializations lead to different solutions that are equally distant from the teacher; the basin structure is robust to initialization randomness.
+
+\subsection{Experiment 2: Ensemble Distillation}
+
+We distill 3-component and 5-component teacher ensembles into single students, replicating Figure 1b. Here the teacher is strictly more capable than any individual student.
+
+\begin{table}[t]
+\centering
+\caption{Ensemble distillation results (1 trial each).}
+\label{tab:ensemble_distill}
+\begin{small}
+\begin{tabular}{lcccc}
+\toprule
+Teacher & T.\ Acc & S.\ Acc & Agree & KL \\
+\midrule
+1-teacher & 65.22 & 68.62 & 71.36 & 0.854 \\
+3-teacher & 71.56 & 69.88 & 78.23 & 0.574 \\
+5-teacher & 73.20 & 69.79 & 79.86 & 0.468 \\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{table}
+
+Table~\ref{tab:ensemble_distill} reveals several trends. First, ensemble teachers are substantially more accurate than individual models: the 3-teacher ensemble reaches 71.56\% and the 5-teacher ensemble 73.20\%, compared to 65.22\% for a single teacher. Second, agreement increases with ensemble size: from 71.36\% (1-teacher) to 78.23\% (3-teacher) to 79.86\% (5-teacher), while KL divergence decreases correspondingly from 0.854 to 0.574 to 0.468. This confirms the paper's finding that fidelity and generalization become positively correlated in the ensemble setting, unlike self-distillation where the student outperforms the teacher while disagreeing with it.
+
+However, the student's accuracy ($\sim$69.8\%) remains well below the 5-teacher ensemble (73.20\%), and agreement plateaus near 80\%, far from perfect. The fidelity gap persists even with stronger teachers, confirming that the optimization barrier is a general phenomenon, not an artifact of the self-distillation setup.
+
+Unlike self-distillation, where low fidelity can be harmless (the student finds a better solution), low fidelity in ensemble distillation represents a genuine loss: the student cannot capture the ensemble's diversity-driven improvements. Additionally, ensemble distributions encode disagreement among committee members, making them richer but potentially \emph{harder} for a single student to match.
+
+\subsection{Experiment 3: Initialization Proximity}
+
+This experiment (replicating Figure 6b) is perhaps the most revealing. We initialize the student as a convex combination:
+\begin{equation}
+\theta_s = \lambda \cdot \theta_t + (1-\lambda) \cdot \theta_r,
+\end{equation}
+where $\theta_t$ are the teacher's trained parameters, $\theta_r$ is a random initialization, and $\lambda \in [0, 1]$ controls proximity. At $\lambda = 0$ (standard distillation), the student starts randomly. At $\lambda = 1$, it starts at the teacher's weights. We scale the learning rate as $\text{lr} = \text{lr}_0 \cdot (1 - \lambda)$.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\linewidth]{../plots/figure6b_initialization.png}
+\caption{Initialization proximity vs.\ agreement. A phase transition at $\lambda \approx 0.3$ to $0.4$ reveals distinct basins in the loss landscape.}
+\label{fig:initialization}
+\end{figure}
+
+\textbf{Analysis.} The original paper shows a sharp transition at $\lambda \approx 0.3$ to $0.4$: below this threshold, the student converges to a basin far from the teacher ($\sim$80\% train agreement); above it, the student remains in the teacher's basin ($>$95\% agreement). This phase transition is the most compelling evidence for the optimization hypothesis.
+
+Our results confirm the phase transition. At $\lambda = 0.0$ and $\lambda = 0.25$, the student converges to a distant basin (test agreement 72.14\% and 72.65\%, respectively). At $\lambda = 0.375$, agreement jumps sharply to 96.51\%, and remains high at 96.92\% ($\lambda = 0.5$) and 98.02\% ($\lambda = 1.0$). The transition occurs between $\lambda = 0.25$ and $\lambda = 0.375$, precisely in the range ($0.3$ to $0.4$) predicted by the paper. Above the threshold, accuracy drops to $\sim$65.5\%, matching the teacher's 65.22\%, confirming that the student stays in the teacher's basin at the cost of not finding its own (better) solution.
+
+Note that we use BatchNorm throughout, unlike the paper's LayerNorm. BatchNorm statistics (running mean and variance) are not straightforward to interpolate, potentially introducing confounds at intermediate $\lambda$ values. Despite this, the phase transition is clearly observed, confirming the fundamental claim about loss landscape structure.
+
 
 \bibliographystyle{icml2026}
 \bibliography{references}
