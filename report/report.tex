@@ -296,6 +296,59 @@ Our results confirm the phase transition. At $\lambda = 0.0$ and $\lambda = 0.25
 
 Note that we use BatchNorm throughout, unlike the paper's LayerNorm. BatchNorm statistics (running mean and variance) are not straightforward to interpolate, potentially introducing confounds at intermediate $\lambda$ values. Despite this, the phase transition is clearly observed, confirming the fundamental claim about loss landscape structure.
 
+\subsection{Experiment 4: CKA Analysis}
+
+We compare students initialized randomly versus from teacher weights (replicating Table 1), using CKA at each of the three residual stages.
+
+\begin{table}[t]
+\centering
+\caption{CKA analysis: random vs.\ teacher initialization.}
+\label{tab:cka}
+\begin{small}
+\begin{tabular}{lccccc}
+\toprule
+Init. & Agree & KL & CKA$_1$ & CKA$_2$ & CKA$_3$ \\
+\midrule
+Random & 72.32 & 0.781 & 0.871 & 0.915 & 0.985 \\
+Teacher & 72.92 & 0.746 & 0.935 & 0.932 & 0.985 \\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{table}
+
+Table~\ref{tab:cka} shows that CKA values are high in both conditions (0.871 to 0.985), indicating strong representational similarity between teacher and student regardless of initialization. Teacher initialization increases CKA at stage 1 (0.935 vs.\ 0.871) and stage 2 (0.932 vs.\ 0.915), but agreement barely changes: 72.92\% vs.\ 72.32\%, a difference of only 0.6pp. KL divergence is similarly unaffected (0.746 vs.\ 0.781). This confirms the paper's finding: sharing an initialization increases representational similarity but does \emph{not} meaningfully improve fidelity.
+
+This disconnect between CKA and agreement has theoretical significance. Networks can learn nearly identical internal representations while producing different outputs, suggesting the mapping from representations to predictions (the final classification head) introduces substantial variability. If CKA similarity guaranteed functional similarity, then distillation methods targeting intermediate representations (e.g., FitNets~\citep{romero2015fitnets}) would also produce high agreement. Our results confirm that this is not the case, motivating future work on methods that explicitly target functional similarity rather than representational alignment.
+
+\subsection{Supplementary: Temperature and Augmentation Effects}
+
+We additionally investigate the effect of temperature and data augmentation on fidelity, replicating aspects of Figure 3 in the original paper. These experiments test the \emph{inductive bias} hypothesis: that choices like temperature and augmentation might be responsible for the fidelity gap.
+
+We train students under three conditions: (1) $\tau=1$, where the teacher's softmax output is sharply peaked and the student sees little information about the teacher's uncertainty; (2) $\tau=4$ (our default), where the softened output spreads probability across classes, revealing more of the teacher's internal ranking; and (3) $\tau=4$ with MixUp augmentation ($\alpha_{\text{mixup}}=1.0$) \citep{zhang2018mixup}, which blends pairs of training images and their labels to create synthetic examples that expose the student to more of the teacher's behavior across the input space.
+
+The original paper finds that higher temperature and MixUp both improve agreement modestly, but neither eliminates the fidelity gap. Temperature $\tau=4$ yields better fidelity than $\tau=1$ because softer labels provide richer gradient information about the teacher's full distribution. MixUp provides additional training diversity but does not fundamentally change the optimization landscape structure.
+
+\begin{table}[t]
+\centering
+\caption{Temperature and augmentation effects on distillation fidelity (1 trial each, 5-teacher ensemble). All rows use the same teacher ensemble for a fair comparison.}
+\label{tab:augmentation}
+\begin{small}
+\begin{tabular}{lccc}
+\toprule
+Setting & Acc (\%) & Agree (\%) & KL \\
+\midrule
+$\tau=1$, no MixUp & 69.02 & 75.60 & 0.568 \\
+$\tau=4$, no MixUp & 69.84 & 80.51 & 0.465 \\
+$\tau=4$, MixUp & 68.76 & 80.36 & 0.421 \\
+\bottomrule
+\end{tabular}
+\end{small}
+\end{table}
+
+Table~\ref{tab:augmentation} shows that higher temperature substantially improves fidelity: $\tau=4$ achieves 80.51\% agreement compared to 75.60\% for $\tau=1$, a gain of nearly 5pp, with KL decreasing from 0.568 to 0.465. Adding MixUp on top of $\tau=4$ reduces KL further (0.421 vs.\ 0.465) but agreement is essentially unchanged (80.36\% vs.\ 80.51\%). This confirms the paper's finding: MixUp provides marginal improvement in distributional similarity but does not close the fidelity gap, consistent with the optimization hypothesis being the dominant factor. All three rows use the same 5-teacher ensemble, ensuring a fair comparison.
+
+We additionally investigate the effect of optimizer choice and training duration (replicating Figure 6a). With SGD for 300 epochs (single teacher), the student achieves 70.88\% agreement; doubling to 600 epochs yields 71.41\%, a negligible improvement of 0.53pp. Switching from SGD to Adam at 300 epochs yields 70.61\% agreement, comparable to SGD. Neither longer training nor a different optimizer closes the fidelity gap.
+
 
 \bibliographystyle{icml2026}
 \bibliography{references}
