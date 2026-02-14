@@ -412,6 +412,13 @@ Replication of ML experiments presents challenges beyond algorithmic correctness
 
 These challenges underscore the value of containerized environments for exact reproduction and publishing qualitative claims that are robust to implementation details.
 
+\section{Conclusion}
+
+We replicated the core experiments from ``Does Knowledge Distillation Really Work?'' using different software (PyTorch 2.10 vs.\ 1.10) and hardware (RTX 4060 Ti) than the original, and confirmed all central findings. Our additional baseline of pairwise teacher agreement ($63\%$) contextualizes the fidelity gap: distillation lifts agreement to $71\%$, a real but partial improvement.
+
+\textbf{Limitations.} Our teacher accuracy (${\sim}65\%$) is lower than the original (${\sim}70.5\%$), which may affect the magnitude of fidelity metrics though not their direction. Our computational budget limited us to fewer trials for some experiments and a sparse $\lambda$ sweep, reducing statistical power.
+
+Despite these limitations, the qualitative consistency of our results across a substantially different software and hardware stack reinforces the robustness of the original findings and suggests they reflect fundamental properties of knowledge distillation rather than artifacts of a particular setup.
 
 \bibliographystyle{icml2026}
 \bibliography{references}
